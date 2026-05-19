@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ACH Timesheet Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridjs@5.0.2/dist/theme/mermaid.min.css" integrity="sha384-jZvDSsmGB9oGGT/4l9bHXGoAv1OxvG/cFmSo0dZaSqmBgvQTKDBFAMftlXTmMbNW" crossorigin="anonymous">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gridjs@5.0.2/dist/gridjs.umd.js" integrity="sha384-/XXDzxe4FsGiAe50i/u9pY/Vy/uX654MHB1xoc1BJNnH1WXHhqHga9g3q5tF4gj7" crossorigin="anonymous"></script>
+  <style>
+    :root { color-scheme: light; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      background: #f0f4f9; color: #1a2236; padding: 20px; min-height: 100vh;
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(130deg, #12376e 0%, #1a6faf 100%);
+      color: white; padding: 22px 26px; border-radius: 16px; margin-bottom: 20px;
+      display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 10px;
+    }
+    .header h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+    .header .sub { font-size: 13px; opacity: 0.75; margin-top: 4px; }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .meta { font-size: 12px; opacity: 0.6; text-align: right; }
+    .btn-reload {
+      padding: 7px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+      border: 1.5px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.12);
+      color: white; cursor: pointer; transition: all 0.15s;
+    }
+    .btn-reload:hover { background: rgba(255,255,255,0.22); }
+
+    /* Filters */
+    .filters {
+      background: white; border-radius: 14px; padding: 14px 18px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.06); margin-bottom: 18px;
+      display: flex; flex-direction: column; gap: 13px;
+    }
+    .filter-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .filter-divider { height: 1px; background: #f0f3f8; }
+    .filter-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: #8899aa; min-width: 70px; flex-shrink: 0; }
+
+    /* Chips */
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 5px 13px; border-radius: 20px; font-size: 12px; font-weight: 600;
+      border: 1.5px solid #dde3ee; background: white; color: #667;
+      cursor: pointer; transition: all 0.15s ease; user-select: none; white-space: nowrap;
+    }
+    .chip:hover { border-color: var(--c,#1a6faf); color: var(--c,#1a6faf); }
+    .chip.active { background: var(--c,#1a6faf); border-color: var(--c,#1a6faf); color: white; }
+    .chip .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.75; flex-shrink: 0; }
+
+    /* Date inputs */
+    .date-inputs { display: flex; align-items: center; gap: 6px; margin-left: 4px; flex-wrap: wrap; }
+    .date-sep { font-size: 12px; color: #aab; }
+    input[type="date"] {
+      padding: 5px 10px; border: 1.5px solid #dde3ee; border-radius: 20px;
+      font-size: 12px; font-weight: 600; color: #667; background: white; cursor: pointer;
+    }
+    input[type="date"]:focus { outline: none; border-color: #1a6faf; }
+    .btn-clear {
+      padding: 5px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+      border: 1.5px solid #dde3ee; background: white; color: #aab; cursor: pointer;
+    }
+    .btn-clear:hover { border-color: #e74c3c; color: #e74c3c; }
+
+    /* Stat cards */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; margin-bottom: 18px; }
+    .stat-card {
+      background: white; border-radius: 14px; padding: 18px 20px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.06); border-left: 4px solid var(--accent,#1a6faf);
+    }
+    .stat-card.highlight { background: linear-gradient(135deg, #f0f7ff, #e8f4ff); }
+    .stat-card .lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: #8899aa; margin-bottom: 8px; }
+    .stat-card .val { font-size: 26px; font-weight: 800; color: #1a2236; line-height: 1; }
+    .stat-card .hint { font-size: 11px; color: #aab; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Charts */
+    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+    @media (max-width: 580px) { .charts-row { grid-template-columns: 1fr; } }
+    .card { background: white; border-radius: 14px; padding: 18px 20px; box-shadow: 0 1px 6px rgba(0,0,0,0.06); }
+    .card h3 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: #8899aa; margin-bottom: 14px; }
+    .chart-wrap { position: relative; height: 210px; }
+
+    /* Calc section */
+    .calc-card {
+      background: white; border-radius: 14px; padding: 18px 20px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.06); margin-bottom: 18px;
+    }
+    .calc-card h3 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: #8899aa; margin-bottom: 14px; }
+    .calc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .calc-table th {
+      text-align: left; padding: 8px 12px; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.5px; color: #8899aa;
+      background: #f5f7fb; border-bottom: 1px solid #eef1f7;
+    }
+    .calc-table th:not(:first-child) { text-align: right; }
+    .calc-table td { padding: 10px 12px; border-bottom: 1px solid #f0f3f8; color: #1a2236; }
+    .calc-table td:not(:first-child) { text-align: right; }
+    .calc-table tbody tr:hover td { background: #fafbfd; }
+    .calc-table tfoot td { font-weight: 700; background: #f5f7fb; border-top: 2px solid #dde3ee; border-bottom: none; }
+    .rate-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; background: #eef6ff; color: #1a6faf; }
+    .rate-badge.low { background: #fff4e6; color: #e67e22; }
+    .processed-val { font-weight: 700; color: #1a6faf; }
+    .user-avatar {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 26px; height: 26px; border-radius: 50%; font-size: 10px; font-weight: 700;
+      color: white; margin-right: 8px; flex-shrink: 0;
+    }
+    .user-cell { display: flex; align-items: center; }
+    small.sub { display: block; font-size: 11px; color: #aab; margin-top: 2px; }
+
+    /* Table */
+    .table-card { background: white; border-radius: 14px; padding: 18px 20px; box-shadow: 0 1px 6px rgba(0,0,0,0.06); }
+    .table-card h3 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: #8899aa; margin-bottom: 14px; }
+    .gridjs-wrapper { border: none !important; box-shadow: none !important; }
+    .gridjs-head input { font-size: 13px; border-radius: 8px; border: 1.5px solid #dde3ee; padding: 6px 10px; }
+    .gridjs-th { background: #f5f7fb !important; font-size: 11px !important; font-weight: 700 !important; text-transform: uppercase; letter-spacing: 0.5px; color: #667 !important; }
+    .gridjs-td { font-size: 13px !important; vertical-align: middle; }
+    .gridjs-footer { border: none !important; }
+
+    /* States */
+    .loading-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; color: #8899aa; gap: 14px; }
+    .spinner { width: 36px; height: 36px; border: 3px solid #dde3ee; border-top-color: #1a6faf; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .error-box { background: #fff5f5; border: 1.5px solid #ffc0c0; color: #cc2222; border-radius: 10px; padding: 16px 18px; font-size: 13px; line-height: 1.6; }
+    .error-box pre { margin-top: 8px; font-size: 11px; background: #fff0f0; padding: 8px; border-radius: 6px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+    .error-box a { color: #1a6faf; }
+    .empty-state { text-align: center; padding: 40px 20px; color: #8899aa; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div>
+      <h1>&#9203; ACH Timesheet Dashboard</h1>
+      <p class="sub" id="sub-text">Cargando datos desde Google Sheets&hellip;</p>
+    </div>
+    <div class="header-right">
+      <span class="meta" id="meta-text"></span>
+      <button class="btn-reload" onclick="loadData()">&#8635; Recargar</button>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters">
+    <div class="filter-row">
+      <span class="filter-label">Per&iacute;odo</span>
+      <div class="chips" id="date-chips">
+        <button class="chip active" data-preset="" style="--c:#1a2236" onclick="setQuickDate('')">Todo</button>
+        <button class="chip" data-preset="week" style="--c:#1a6faf" onclick="setQuickDate('week')">&#218;ltima semana</button>
+        <button class="chip" data-preset="month" style="--c:#1a6faf" onclick="setQuickDate('month')">&#218;ltimo mes</button>
+      </div>
+      <div class="date-inputs">
+        <input type="date" id="date-from" title="Desde" onchange="onDateInputChange()">
+        <span class="date-sep">&rarr;</span>
+        <input type="date" id="date-to" title="Hasta" onchange="onDateInputChange()">
+        <button class="btn-clear" onclick="clearDates()">&times;</button>
+      </div>
+    </div>
+    <div class="filter-divider"></div>
+    <div class="filter-row">
+      <span class="filter-label">&Aacute;rea</span>
+      <div class="chips" id="area-chips"></div>
+    </div>
+    <div class="filter-divider"></div>
+    <div class="filter-row">
+      <span class="filter-label">Proyecto</span>
+      <div class="chips" id="project-chips"></div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card" style="--accent:#1a6faf">
+      <div class="lbl">Total horas</div>
+      <div class="val" id="s-total">&mdash;</div>
+      <div class="hint" id="s-total-h"></div>
+    </div>
+    <div class="stat-card highlight" style="--accent:#1a6faf">
+      <div class="lbl">Horas procesadas</div>
+      <div class="val" id="s-processed">&mdash;</div>
+      <div class="hint" id="s-processed-h">ponderadas por usuario</div>
+    </div>
+    <div class="stat-card" style="--accent:#27ae60">
+      <div class="lbl">&Aacute;reas</div>
+      <div class="val" id="s-areas">&mdash;</div>
+      <div class="hint" id="s-areas-h"></div>
+    </div>
+    <div class="stat-card" style="--accent:#8e44ad">
+      <div class="lbl">Proyectos</div>
+      <div class="val" id="s-projects">&mdash;</div>
+      <div class="hint" id="s-projects-h"></div>
+    </div>
+    <div class="stat-card" style="--accent:#e67e22">
+      <div class="lbl">Registros</div>
+      <div class="val" id="s-entries">&mdash;</div>
+      <div class="hint">entradas de tiempo</div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-row">
+    <div class="card">
+      <h3>Horas por &aacute;rea</h3>
+      <div class="chart-wrap"><canvas id="chart-areas"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Horas por proyecto</h3>
+      <div class="chart-wrap"><canvas id="chart-projects"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Processed hours -->
+  <div class="calc-card">
+    <h3>C&aacute;lculo de horas procesadas por usuario</h3>
+    <div id="calc-container">
+      <div class="loading-state"><div class="spinner"></div><span>Cargando&hellip;</span></div>
+    </div>
+  </div>
+
+  <!-- Detail table -->
+  <div class="table-card">
+    <h3>Detalle de registros</h3>
+    <div id="grid-container">
+      <div class="loading-state"><div class="spinner"></div><span>Cargando&hellip;</span></div>
+    </div>
+  </div>
+
+<script>
+  // ─── CONFIGURACIÓN ────────────────────────────────────────────────
+  // URL de publicación CSV — generada desde Archivo > Publicar en la web > CSV
+  var CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSLMbCuGXheKqd1iPihPJEUcMIRKZznrWmeEx_EmsGJ7NJcAW9EQXHHIse0uOLzPP-0QkZMPNDcTtWJ/pub?output=csv';
+
+  // Proxy CORS — se usa automáticamente si el navegador bloquea la petición directa
+  // (ocurre al abrir el archivo desde file://)
+  var CORS_PROXIES = [
+    function(url){ return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url); },
+    function(url){ return 'https://corsproxy.io/?' + encodeURIComponent(url); },
+  ];
+
+  // Tarifas por usuario (horas procesadas = horas_reales × tarifa)
+  var USER_RATES = {
+    'Nestor Tobar':                 1,
+    'Néstor Tobar':                 1,
+    'Jose Andres Moncada Quintero': 1,
+    'Lab User':                     0.03,
+  };
+  // ──────────────────────────────────────────────────────────────────
+
+  var PALETTE = ['#1a6faf','#27ae60','#8e44ad','#e67e22','#e74c3c','#16a085','#2980b9','#f39c12','#c0392b','#1abc9c'];
+
+  var allData = [], filteredData = [];
+  var chartA = null, chartP = null, grid = null;
+  var selectedAreas    = new Set();
+  var selectedProjects = new Set();
+  var dateFrom = null, dateTo = null, quickPreset = '';
+
+  function getRate(user) {
+    return USER_RATES.hasOwnProperty(user) ? USER_RATES[user] : 1;
+  }
+  function initials(name) {
+    return (name||'?').split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+  }
+
+  /* ── CSV parser ── */
+  function parseCSVLine(line) {
+    var result = [], cur = '', inQ = false;
+    for (var i = 0; i < line.length; i++) {
+      var c = line[i];
+      if (c === '"') {
+        if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+        else inQ = !inQ;
+      } else if (c === ',' && !inQ) {
+        result.push(cur.trim()); cur = '';
+      } else { cur += c; }
+    }
+    result.push(cur.trim());
+    return result;
+  }
+
+  function parseCSV(text) {
+    var lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim().split('\n');
+    if (lines.length < 2) return [];
+    var headers = parseCSVLine(lines[0]);
+    var rows = [];
+    for (var i = 1; i < lines.length; i++) {
+      if (!lines[i].trim()) continue;
+      var cells = parseCSVLine(lines[i]);
+      // pad or trim to match headers
+      while (cells.length < headers.length) cells.push('');
+      var row = {};
+      headers.forEach(function(h, j) { row[h] = cells[j] || ''; });
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  /* ── Duration & formatting ── */
+  function parseDur(iso) {
+    if (!iso) return 0;
+    var m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:([\d.]+)S)?/);
+    if (!m) return 0;
+    return (+m[1]||0) + (+m[2]||0)/60 + (+m[3]||0)/3600;
+  }
+  function fmtH(h) {
+    var hh=Math.floor(h), mm=Math.round((h-hh)*60);
+    if(hh===0) return mm+'m'; if(mm===0) return hh+'h'; return hh+'h '+mm+'m';
+  }
+  function fmtHDec(h) { return h.toFixed(2)+'h'; }
+  function fmtDate(s) {
+    if (!s) return '';
+    try { return new Date(s).toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'}); }
+    catch(e) { return s; }
+  }
+  function toDateOnly(s) {
+    if (!s) return null;
+    try { var d=new Date(s); return isNaN(d)?null:new Date(d.toDateString()); } catch(e) { return null; }
+  }
+
+  function groupByKey(data, key) {
+    var map={};
+    data.forEach(function(r){var k=r[key]||'Sin asignar'; map[k]=(map[k]||0)+parseDur(r['Time']);});
+    return Object.entries(map).sort(function(a,b){return b[1]-a[1];});
+  }
+
+  /* ── Date filters ── */
+  function setQuickDate(preset) {
+    quickPreset = preset;
+    var now = new Date();
+    if (preset==='week') {
+      dateTo=new Date(now); dateTo.setHours(23,59,59,999);
+      dateFrom=new Date(now); dateFrom.setDate(dateFrom.getDate()-7); dateFrom.setHours(0,0,0,0);
+    } else if (preset==='month') {
+      dateTo=new Date(now); dateTo.setHours(23,59,59,999);
+      dateFrom=new Date(now); dateFrom.setMonth(dateFrom.getMonth()-1); dateFrom.setHours(0,0,0,0);
+    } else { dateFrom=null; dateTo=null; }
+    document.getElementById('date-from').value = dateFrom ? dateFrom.toISOString().slice(0,10) : '';
+    document.getElementById('date-to').value   = dateTo   ? dateTo.toISOString().slice(0,10)   : '';
+    syncDateChips(); applyFilters();
+  }
+  function onDateInputChange() {
+    quickPreset='custom';
+    var fv=document.getElementById('date-from').value;
+    var tv=document.getElementById('date-to').value;
+    dateFrom=fv?new Date(fv+'T00:00:00'):null;
+    dateTo  =tv?new Date(tv+'T23:59:59'):null;
+    syncDateChips(); applyFilters();
+  }
+  function clearDates() {
+    quickPreset=''; dateFrom=null; dateTo=null;
+    document.getElementById('date-from').value='';
+    document.getElementById('date-to').value='';
+    syncDateChips(); applyFilters();
+  }
+  function syncDateChips() {
+    document.querySelectorAll('#date-chips .chip').forEach(function(chip){
+      chip.classList.toggle('active', chip.dataset.preset===quickPreset);
+    });
+  }
+
+  /* ── Stats ── */
+  function renderStats(data) {
+    var total=data.reduce(function(s,r){return s+parseDur(r['Time']);},0);
+    var processed=data.reduce(function(s,r){return s+parseDur(r['Time'])*getRate(r['User']||'');},0);
+    var areas=[...new Set(data.map(function(r){return r['Client'];}).filter(Boolean))];
+    var projects=[...new Set(data.map(function(r){return r['Project'];}).filter(Boolean))];
+    document.getElementById('s-total').textContent      = fmtH(total);
+    document.getElementById('s-total-h').textContent    = fmtHDec(total)+' exactas';
+    document.getElementById('s-processed').textContent  = fmtH(processed);
+    document.getElementById('s-processed-h').textContent= fmtHDec(processed)+' ponderadas';
+    document.getElementById('s-areas').textContent      = areas.length;
+    document.getElementById('s-areas-h').textContent    = areas.slice(0,2).join(', ')||'—';
+    document.getElementById('s-projects').textContent   = projects.length;
+    document.getElementById('s-projects-h').textContent = projects.slice(0,2).join(', ')||'—';
+    document.getElementById('s-entries').textContent    = data.length;
+  }
+
+  /* ── Charts ── */
+  function renderChart(canvasId, groups, existing) {
+    var ctx=document.getElementById(canvasId).getContext('2d');
+    if (existing) existing.destroy();
+    if (!groups.length) { ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height); return null; }
+    return new Chart(ctx, {
+      type:'bar',
+      data:{
+        labels:groups.map(function(g){return g[0];}),
+        datasets:[{data:groups.map(function(g){return g[1];}),
+          backgroundColor:groups.map(function(_,i){return PALETTE[i%PALETTE.length]+'bb';}),
+          borderColor:groups.map(function(_,i){return PALETTE[i%PALETTE.length];}),
+          borderWidth:2, borderRadius:7}]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return ' '+fmtH(c.parsed.y);}}}},
+        scales:{
+          y:{beginAtZero:true,grid:{color:'#f0f3f8'},ticks:{callback:function(v){return fmtH(v);},font:{size:11}}},
+          x:{grid:{display:false},ticks:{font:{size:11},maxRotation:30}}
+        }
+      }
+    });
+  }
+
+  /* ── Calc table ── */
+  function renderCalc(data) {
+    var container=document.getElementById('calc-container');
+    if (!data.length) { container.innerHTML='<div class="empty-state">Sin datos para calcular.</div>'; return; }
+    var userMap={};
+    data.forEach(function(r){
+      var user=r['User']||'Desconocido';
+      var h=parseDur(r['Time']);
+      if (!userMap[user]) userMap[user]={hours:0,rate:getRate(user)};
+      userMap[user].hours+=h;
+    });
+    var users=Object.entries(userMap).sort(function(a,b){return b[1].hours-a[1].hours;});
+    var totalRaw=users.reduce(function(s,u){return s+u[1].hours;},0);
+    var totalProc=users.reduce(function(s,u){return s+u[1].hours*u[1].rate;},0);
+    var avatarColors=['#1a6faf','#27ae60','#8e44ad','#e67e22','#e74c3c'];
+    var rows=users.map(function(u,i){
+      var user=u[0],hours=u[1].hours,rate=u[1].rate,proc=hours*rate,isLow=rate<1;
+      var color=avatarColors[i%avatarColors.length];
+      return '<tr>'
+        +'<td><div class="user-cell"><span class="user-avatar" style="background:'+color+'">'+initials(user)+'</span>'+user+'</div></td>'
+        +'<td>'+fmtH(hours)+'<small class="sub">'+fmtHDec(hours)+'</small></td>'
+        +'<td><span class="rate-badge'+(isLow?' low':'')+'">&times;'+rate.toFixed(2)+'</span></td>'
+        +'<td class="processed-val">'+fmtH(proc)+'<small class="sub">'+fmtHDec(proc)+'</small></td>'
+        +'</tr>';
+    }).join('');
+    container.innerHTML='<table class="calc-table">'
+      +'<thead><tr><th>Usuario</th><th>Horas registradas</th><th>Tarifa</th><th>Horas procesadas</th></tr></thead>'
+      +'<tbody>'+rows+'</tbody>'
+      +'<tfoot><tr class="total-row"><td>Total</td>'
+      +'<td>'+fmtH(totalRaw)+' <small>'+fmtHDec(totalRaw)+'</small></td>'
+      +'<td>&mdash;</td>'
+      +'<td style="color:#1a6faf">'+fmtH(totalProc)+' <small>'+fmtHDec(totalProc)+'</small></td>'
+      +'</tr></tfoot></table>';
+  }
+
+  /* ── Detail table ── */
+  function renderTable(data) {
+    var container=document.getElementById('grid-container');
+    if (!data.length) {
+      container.innerHTML='<div class="empty-state">Sin registros para los filtros seleccionados.</div>';
+      grid=null; return;
+    }
+    var rows=data.map(function(r){return [
+      fmtDate(r['Date']),r['User']||'—',r['Client']||'—',
+      r['Project']||'—',r['Task']||'—',r['Description']||'—',
+      fmtH(parseDur(r['Time']))
+    ];});
+    if (grid) { grid.updateConfig({data:rows}).forceRender(); return; }
+    container.innerHTML='';
+    grid=new gridjs.Grid({
+      columns:[{name:'Fecha',width:'105px'},{name:'Usuario'},{name:'Área'},
+               {name:'Proyecto'},{name:'Tarea'},{name:'Descripción'},{name:'Tiempo',width:'80px'}],
+      data:rows, sort:true,
+      search:{placeholder:'Buscar registros…'},
+      pagination:{limit:10,summary:true},
+      language:{pagination:{previous:'‹',next:'›',showing:'Mostrando',results:function(){return 'registros';}}}
+    }).render(container);
+  }
+
+  /* ── Chip groups ── */
+  function makeChips(containerId, items, selectedSet, syncFn) {
+    var container=document.getElementById(containerId);
+    container.innerHTML='';
+    var allChip=document.createElement('button');
+    allChip.className='chip active'; allChip.dataset.value='__all__';
+    allChip.style.setProperty('--c','#1a2236'); allChip.textContent='Todos';
+    allChip.onclick=function(){selectedSet.clear();syncFn();applyFilters();};
+    container.appendChild(allChip);
+    items.forEach(function(item,i){
+      var chip=document.createElement('button');
+      chip.className='chip'; chip.dataset.value=item;
+      chip.style.setProperty('--c',PALETTE[i%PALETTE.length]);
+      var dot=document.createElement('span'); dot.className='dot';
+      chip.appendChild(dot); chip.appendChild(document.createTextNode(item));
+      chip.onclick=function(){
+        selectedSet.has(item)?selectedSet.delete(item):selectedSet.add(item);
+        syncFn(); applyFilters();
+      };
+      container.appendChild(chip);
+    });
+  }
+  function syncChipGroup(containerId, selectedSet) {
+    document.getElementById(containerId).querySelectorAll('.chip').forEach(function(chip){
+      var v=chip.dataset.value;
+      chip.classList.toggle('active', v==='__all__'?selectedSet.size===0:selectedSet.has(v));
+    });
+  }
+
+  /* ── Apply filters ── */
+  function applyFilters() {
+    filteredData=allData.filter(function(r){
+      if (selectedAreas.size>0    && !selectedAreas.has(r['Client']))    return false;
+      if (selectedProjects.size>0 && !selectedProjects.has(r['Project'])) return false;
+      if (dateFrom||dateTo) {
+        var d=toDateOnly(r['Date']);
+        if (d) {
+          if (dateFrom && d<new Date(dateFrom.toDateString())) return false;
+          if (dateTo   && d>new Date(dateTo.toDateString()))   return false;
+        }
+      }
+      return true;
+    });
+    renderStats(filteredData);
+    chartA=renderChart('chart-areas',    groupByKey(filteredData,'Client'),  chartA);
+    chartP=renderChart('chart-projects', groupByKey(filteredData,'Project'), chartP);
+    renderCalc(filteredData);
+    renderTable(filteredData);
+  }
+
+  /* ── Main load ── */
+  async function loadData() {
+    // Reset state
+    selectedAreas.clear(); selectedProjects.clear();
+    quickPreset=''; dateFrom=null; dateTo=null;
+    document.getElementById('date-from').value='';
+    document.getElementById('date-to').value='';
+    document.getElementById('sub-text').textContent='Cargando datos…';
+    document.getElementById('meta-text').textContent='';
+    document.getElementById('grid-container').innerHTML=
+      '<div class="loading-state"><div class="spinner"></div><span>Cargando&hellip;</span></div>';
+    document.getElementById('calc-container').innerHTML=
+      '<div class="loading-state"><div class="spinner"></div><span>Cargando&hellip;</span></div>';
+
+    try {
+      // 1. Intento directo (funciona cuando se sirve desde un servidor web)
+      var csvText = null;
+      try {
+        var r = await fetch(CSV_URL);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        csvText = await r.text();
+      } catch(corsErr) {
+        // 2. Fallback: proxies CORS (necesario al abrir desde file://)
+        for (var pi = 0; pi < CORS_PROXIES.length; pi++) {
+          try {
+            var proxyUrl = CORS_PROXIES[pi](CSV_URL);
+            var r2 = await fetch(proxyUrl);
+            if (!r2.ok) throw new Error('HTTP ' + r2.status);
+            csvText = await r2.text();
+            break; // éxito, salir del loop
+          } catch(e2) { /* probar siguiente proxy */ }
+        }
+        if (!csvText) throw new Error('No se pudo cargar el CSV ni directo ni por proxy CORS.');
+      }
+      allData = parseCSV(csvText);
+
+      var now=new Date();
+      document.getElementById('sub-text').textContent=
+        allData.length+' registro'+(allData.length!==1?'s':'')+' de tiempo';
+      document.getElementById('meta-text').textContent=
+        'Actualizado '+now.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+
+      var areas=[...new Set(allData.map(function(r){return r['Client'];}).filter(Boolean))].sort();
+      var projects=[...new Set(allData.map(function(r){return r['Project'];}).filter(Boolean))].sort();
+
+      makeChips('area-chips',areas,selectedAreas,function(){syncChipGroup('area-chips',selectedAreas);});
+      makeChips('project-chips',projects,selectedProjects,function(){syncChipGroup('project-chips',selectedProjects);});
+      syncDateChips();
+
+      filteredData=[...allData];
+      applyFilters();
+
+    } catch(err) {
+      console.error('Dashboard error:',err);
+      document.getElementById('sub-text').textContent='Error al cargar datos';
+      document.getElementById('calc-container').innerHTML='';
+      document.getElementById('grid-container').innerHTML=
+        '<div class="error-box">'
+        +'<strong>&#10060; No se pudieron cargar los datos.</strong><br><br>'
+        +'Error t&eacute;cnico: '+err.message+'<br><br>'
+        +'Si el error persiste, verifica que el Sheet est&eacute; publicado: <em>Archivo &rarr; Publicar en la web &rarr; CSV</em>.'
+        +'<pre>URL: '+CSV_URL+'</pre>'
+        +'</div>';
+    }
+  }
+
+  loadData();
+</script>
+</body>
+</html>
