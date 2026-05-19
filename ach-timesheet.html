@@ -86,34 +86,6 @@
     .card h3 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: #8899aa; margin-bottom: 14px; }
     .chart-wrap { position: relative; height: 210px; }
 
-    /* Calc section */
-    .calc-card {
-      background: white; border-radius: 14px; padding: 18px 20px;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.06); margin-bottom: 18px;
-    }
-    .calc-card h3 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: #8899aa; margin-bottom: 14px; }
-    .calc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .calc-table th {
-      text-align: left; padding: 8px 12px; font-size: 11px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.5px; color: #8899aa;
-      background: #f5f7fb; border-bottom: 1px solid #eef1f7;
-    }
-    .calc-table th:not(:first-child) { text-align: right; }
-    .calc-table td { padding: 10px 12px; border-bottom: 1px solid #f0f3f8; color: #1a2236; }
-    .calc-table td:not(:first-child) { text-align: right; }
-    .calc-table tbody tr:hover td { background: #fafbfd; }
-    .calc-table tfoot td { font-weight: 700; background: #f5f7fb; border-top: 2px solid #dde3ee; border-bottom: none; }
-    .rate-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; background: #eef6ff; color: #1a6faf; }
-    .rate-badge.low { background: #fff4e6; color: #e67e22; }
-    .processed-val { font-weight: 700; color: #1a6faf; }
-    .user-avatar {
-      display: inline-flex; align-items: center; justify-content: center;
-      width: 26px; height: 26px; border-radius: 50%; font-size: 10px; font-weight: 700;
-      color: white; margin-right: 8px; flex-shrink: 0;
-    }
-    .user-cell { display: flex; align-items: center; }
-    small.sub { display: block; font-size: 11px; color: #aab; margin-top: 2px; }
-
     /* Table */
     .table-card { background: white; border-radius: 14px; padding: 18px 20px; box-shadow: 0 1px 6px rgba(0,0,0,0.06); }
     .table-card h3 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: #8899aa; margin-bottom: 14px; }
@@ -215,14 +187,6 @@
     </div>
   </div>
 
-  <!-- Processed hours -->
-  <div class="calc-card">
-    <h3>C&aacute;lculo de horas procesadas por usuario</h3>
-    <div id="calc-container">
-      <div class="loading-state"><div class="spinner"></div><span>Cargando&hellip;</span></div>
-    </div>
-  </div>
-
   <!-- Detail table -->
   <div class="table-card">
     <h3>Detalle de registros</h3>
@@ -248,8 +212,10 @@
     'Nestor Tobar':                 1,
     'Néstor Tobar':                 1,
     'Jose Andres Moncada Quintero': 1,
-    'Lab User':                     0.03,
+    'Lab User':                     0.05,
   };
+
+  var VALID_AREAS = ['Dir. Innovaci\u00f3n', 'Dir. Producto', 'Vicepresidencia'];
   // ──────────────────────────────────────────────────────────────────
 
   var PALETTE = ['#1a6faf','#27ae60','#8e44ad','#e67e22','#e74c3c','#16a085','#2980b9','#f39c12','#c0392b','#1abc9c'];
@@ -263,10 +229,17 @@
   function getRate(user) {
     return USER_RATES.hasOwnProperty(user) ? USER_RATES[user] : 1;
   }
-  function initials(name) {
-    return (name||'?').split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+  function normalizeText(value) {
+    return (value || '').toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   }
-
+  function canonicalArea(area) {
+    var n = normalizeText(area);
+    if (!n) return '';
+    if (n.indexOf('innovacion') !== -1) return 'Dir. Innovaci\u00f3n';
+    if (n.indexOf('producto') !== -1) return 'Dir. Producto';
+    if (n.indexOf('vicepresidencia') !== -1) return 'Vicepresidencia';
+    return '';
+  }
   /* ── CSV parser ── */
   function parseCSVLine(line) {
     var result = [], cur = '', inQ = false;
@@ -327,6 +300,14 @@
     data.forEach(function(r){var k=r[key]||'Sin asignar'; map[k]=(map[k]||0)+parseDur(r['Time']);});
     return Object.entries(map).sort(function(a,b){return b[1]-a[1];});
   }
+  function groupAreas(data) {
+    var map = { 'Dir. Innovaci\u00f3n': 0, 'Dir. Producto': 0, 'Vicepresidencia': 0 };
+    data.forEach(function(r){
+      var area = r['Client'];
+      if (map.hasOwnProperty(area)) map[area] += parseDur(r['Time']);
+    });
+    return Object.entries(map).filter(function(e){ return e[1] > 0; });
+  }
 
   /* ── Date filters ── */
   function setQuickDate(preset) {
@@ -367,7 +348,7 @@
   function renderStats(data) {
     var total=data.reduce(function(s,r){return s+parseDur(r['Time']);},0);
     var processed=data.reduce(function(s,r){return s+parseDur(r['Time'])*getRate(r['User']||'');},0);
-    var areas=[...new Set(data.map(function(r){return r['Client'];}).filter(Boolean))];
+    var areas=[...new Set(data.map(function(r){return r['Client'];}).filter(function(a){return VALID_AREAS.indexOf(a)!==-1;}))];
     var projects=[...new Set(data.map(function(r){return r['Project'];}).filter(Boolean))];
     document.getElementById('s-total').textContent      = fmtH(total);
     document.getElementById('s-total-h').textContent    = fmtHDec(total)+' exactas';
@@ -403,41 +384,6 @@
         }
       }
     });
-  }
-
-  /* ── Calc table ── */
-  function renderCalc(data) {
-    var container=document.getElementById('calc-container');
-    if (!data.length) { container.innerHTML='<div class="empty-state">Sin datos para calcular.</div>'; return; }
-    var userMap={};
-    data.forEach(function(r){
-      var user=r['User']||'Desconocido';
-      var h=parseDur(r['Time']);
-      if (!userMap[user]) userMap[user]={hours:0,rate:getRate(user)};
-      userMap[user].hours+=h;
-    });
-    var users=Object.entries(userMap).sort(function(a,b){return b[1].hours-a[1].hours;});
-    var totalRaw=users.reduce(function(s,u){return s+u[1].hours;},0);
-    var totalProc=users.reduce(function(s,u){return s+u[1].hours*u[1].rate;},0);
-    var avatarColors=['#1a6faf','#27ae60','#8e44ad','#e67e22','#e74c3c'];
-    var rows=users.map(function(u,i){
-      var user=u[0],hours=u[1].hours,rate=u[1].rate,proc=hours*rate,isLow=rate<1;
-      var color=avatarColors[i%avatarColors.length];
-      return '<tr>'
-        +'<td><div class="user-cell"><span class="user-avatar" style="background:'+color+'">'+initials(user)+'</span>'+user+'</div></td>'
-        +'<td>'+fmtH(hours)+'<small class="sub">'+fmtHDec(hours)+'</small></td>'
-        +'<td><span class="rate-badge'+(isLow?' low':'')+'">&times;'+rate.toFixed(2)+'</span></td>'
-        +'<td class="processed-val">'+fmtH(proc)+'<small class="sub">'+fmtHDec(proc)+'</small></td>'
-        +'</tr>';
-    }).join('');
-    container.innerHTML='<table class="calc-table">'
-      +'<thead><tr><th>Usuario</th><th>Horas registradas</th><th>Tarifa</th><th>Horas procesadas</th></tr></thead>'
-      +'<tbody>'+rows+'</tbody>'
-      +'<tfoot><tr class="total-row"><td>Total</td>'
-      +'<td>'+fmtH(totalRaw)+' <small>'+fmtHDec(totalRaw)+'</small></td>'
-      +'<td>&mdash;</td>'
-      +'<td style="color:#1a6faf">'+fmtH(totalProc)+' <small>'+fmtHDec(totalProc)+'</small></td>'
-      +'</tr></tfoot></table>';
   }
 
   /* ── Detail table ── */
@@ -508,9 +454,8 @@
       return true;
     });
     renderStats(filteredData);
-    chartA=renderChart('chart-areas',    groupByKey(filteredData,'Client'),  chartA);
+    chartA=renderChart('chart-areas',    groupAreas(filteredData),            chartA);
     chartP=renderChart('chart-projects', groupByKey(filteredData,'Project'), chartP);
-    renderCalc(filteredData);
     renderTable(filteredData);
   }
 
@@ -524,8 +469,6 @@
     document.getElementById('sub-text').textContent='Cargando datos…';
     document.getElementById('meta-text').textContent='';
     document.getElementById('grid-container').innerHTML=
-      '<div class="loading-state"><div class="spinner"></div><span>Cargando&hellip;</span></div>';
-    document.getElementById('calc-container').innerHTML=
       '<div class="loading-state"><div class="spinner"></div><span>Cargando&hellip;</span></div>';
 
     try {
@@ -548,7 +491,10 @@
         }
         if (!csvText) throw new Error('No se pudo cargar el CSV ni directo ni por proxy CORS.');
       }
-      allData = parseCSV(csvText);
+      allData = parseCSV(csvText).map(function(row){
+        row['Client'] = canonicalArea(row['Client']);
+        return row;
+      });
 
       var now=new Date();
       document.getElementById('sub-text').textContent=
@@ -556,10 +502,9 @@
       document.getElementById('meta-text').textContent=
         'Actualizado '+now.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
 
-      var areas=[...new Set(allData.map(function(r){return r['Client'];}).filter(Boolean))].sort();
       var projects=[...new Set(allData.map(function(r){return r['Project'];}).filter(Boolean))].sort();
 
-      makeChips('area-chips',areas,selectedAreas,function(){syncChipGroup('area-chips',selectedAreas);});
+      makeChips('area-chips',VALID_AREAS,selectedAreas,function(){syncChipGroup('area-chips',selectedAreas);});
       makeChips('project-chips',projects,selectedProjects,function(){syncChipGroup('project-chips',selectedProjects);});
       syncDateChips();
 
@@ -569,7 +514,6 @@
     } catch(err) {
       console.error('Dashboard error:',err);
       document.getElementById('sub-text').textContent='Error al cargar datos';
-      document.getElementById('calc-container').innerHTML='';
       document.getElementById('grid-container').innerHTML=
         '<div class="error-box">'
         +'<strong>&#10060; No se pudieron cargar los datos.</strong><br><br>'
