@@ -31,6 +31,12 @@
       color: white; cursor: pointer; transition: all 0.15s;
     }
     .btn-reload:hover { background: rgba(255,255,255,0.22); }
+    .btn-toggle {
+      padding: 7px 14px; border-radius: 20px; font-size: 12px; font-weight: 700;
+      border: 1.5px solid rgba(255,255,255,0.45); background: rgba(255,255,255,0.2);
+      color: white; cursor: pointer; transition: all 0.15s;
+    }
+    .btn-toggle:hover { background: rgba(255,255,255,0.3); }
 
     /* Filters */
     .filters {
@@ -114,6 +120,7 @@
     </div>
     <div class="header-right">
       <span class="meta" id="meta-text"></span>
+      <button class="btn-toggle" id="view-toggle" onclick="toggleHoursMode()">Vista: procesadas</button>
       <button class="btn-reload" onclick="loadData()">&#8635; Recargar</button>
     </div>
   </div>
@@ -178,18 +185,18 @@
   <!-- Charts -->
   <div class="charts-row">
     <div class="card">
-      <h3>Horas por &aacute;rea</h3>
+      <h3 id="chart-areas-title">Horas procesadas por &aacute;rea</h3>
       <div class="chart-wrap"><canvas id="chart-areas"></canvas></div>
     </div>
     <div class="card">
-      <h3>Horas por proyecto</h3>
+      <h3 id="chart-projects-title">Horas procesadas por proyecto</h3>
       <div class="chart-wrap"><canvas id="chart-projects"></canvas></div>
     </div>
   </div>
 
   <!-- Detail table -->
   <div class="table-card">
-    <h3>Detalle de registros</h3>
+    <h3 id="table-title">Detalle de registros (horas procesadas)</h3>
     <div id="grid-container">
       <div class="loading-state"><div class="spinner"></div><span>Cargando&hellip;</span></div>
     </div>
@@ -225,6 +232,7 @@
   var selectedAreas    = new Set();
   var selectedProjects = new Set();
   var dateFrom = null, dateTo = null, quickPreset = '';
+  var hourViewMode = 'processed';
 
   function getRate(user) {
     return USER_RATES.hasOwnProperty(user) ? USER_RATES[user] : 1;
@@ -295,16 +303,37 @@
     try { var d=new Date(s); return isNaN(d)?null:new Date(d.toDateString()); } catch(e) { return null; }
   }
 
+  function getHoursForView(row) {
+    var h = parseDur(row['Time']);
+    if (hourViewMode === 'processed') return h * getRate(row['User'] || '');
+    return h;
+  }
+  function getHoursViewLabel() {
+    return hourViewMode === 'processed' ? 'procesadas' : 'totales';
+  }
+  function syncHoursModeUI() {
+    var viewLabel = getHoursViewLabel();
+    document.getElementById('view-toggle').textContent = 'Vista: ' + viewLabel;
+    document.getElementById('chart-areas-title').textContent = 'Horas ' + viewLabel + ' por área';
+    document.getElementById('chart-projects-title').textContent = 'Horas ' + viewLabel + ' por proyecto';
+    document.getElementById('table-title').textContent = 'Detalle de registros (horas ' + viewLabel + ')';
+  }
+  function toggleHoursMode() {
+    hourViewMode = (hourViewMode === 'processed') ? 'total' : 'processed';
+    syncHoursModeUI();
+    applyFilters();
+  }
+
   function groupByKey(data, key) {
     var map={};
-    data.forEach(function(r){var k=r[key]||'Sin asignar'; map[k]=(map[k]||0)+parseDur(r['Time']);});
+    data.forEach(function(r){var k=r[key]||'Sin asignar'; map[k]=(map[k]||0)+getHoursForView(r);});
     return Object.entries(map).sort(function(a,b){return b[1]-a[1];});
   }
   function groupAreas(data) {
     var map = { 'Dir. Innovaci\u00f3n': 0, 'Dir. Producto': 0, 'Vicepresidencia': 0 };
     data.forEach(function(r){
       var area = r['Client'];
-      if (map.hasOwnProperty(area)) map[area] += parseDur(r['Time']);
+      if (map.hasOwnProperty(area)) map[area] += getHoursForView(r);
     });
     return Object.entries(map).filter(function(e){ return e[1] > 0; });
   }
@@ -396,13 +425,15 @@
     var rows=data.map(function(r){return [
       fmtDate(r['Date']),r['User']||'—',r['Client']||'—',
       r['Project']||'—',r['Task']||'—',r['Description']||'—',
-      fmtH(parseDur(r['Time']))
+      fmtH(getHoursForView(r))
     ];});
-    if (grid) { grid.updateConfig({data:rows}).forceRender(); return; }
+    var columns=[{name:'Fecha',width:'105px'},{name:'Usuario'},{name:'Área'},
+                 {name:'Proyecto'},{name:'Tarea'},{name:'Descripción'},
+                 {name:'Horas ('+getHoursViewLabel()+')',width:'120px'}];
+    if (grid) { grid.updateConfig({columns:columns,data:rows}).forceRender(); return; }
     container.innerHTML='';
     grid=new gridjs.Grid({
-      columns:[{name:'Fecha',width:'105px'},{name:'Usuario'},{name:'Área'},
-               {name:'Proyecto'},{name:'Tarea'},{name:'Descripción'},{name:'Tiempo',width:'80px'}],
+      columns:columns,
       data:rows, sort:true,
       search:{placeholder:'Buscar registros…'},
       pagination:{limit:10,summary:true},
@@ -525,6 +556,7 @@
   }
 
   loadData();
+  syncHoursModeUI();
 </script>
 </body>
 </html>
