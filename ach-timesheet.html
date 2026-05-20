@@ -207,6 +207,9 @@
   // URL de publicación CSV — generada desde Archivo > Publicar en la web > CSV
   var CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSLMbCuGXheKqd1iPihPJEUcMIRKZznrWmeEx_EmsGJ7NJcAW9EQXHHIse0uOLzPP-0QkZMPNDcTtWJ/pub?output=csv';
 
+  // CSV de configuración de reglas de precios
+  var CONFIG_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQCah0aKR_6J9QgAQc9OJdblrcF3hmKkNkLkNt-YiLcXynUaukVn2KlUkPbkRIarEe168fNUXAdWF0-/pub?gid=0&single=true&output=csv';
+
   // Proxy CORS — se usa automáticamente si el navegador bloquea la petición directa
   // (ocurre al abrir el archivo desde file://)
   var CORS_PROXIES = [
@@ -214,13 +217,9 @@
     function(url){ return 'https://corsproxy.io/?' + encodeURIComponent(url); },
   ];
 
-  // Tarifas por usuario (horas procesadas = horas_reales × tarifa)
-  var USER_RATES = {
-    'Nestor Tobar':                 1,
-    'Néstor Tobar':                 1,
-    'Jose Andres Moncada Quintero': 1,
-    'Lab User':                     0.05,
-  };
+  // Tasas dinámicas cargadas desde el CSV de configuración
+  var dynamicUserRates    = {};
+  var dynamicProjectRates = {};
 
   var VALID_AREAS = ['Dir. Innovaci\u00f3n', 'Dir. Producto', 'Vicepresidencia'];
   // ──────────────────────────────────────────────────────────────────
@@ -234,8 +233,14 @@
   var dateFrom = null, dateTo = null, quickPreset = '';
   var hourViewMode = 'processed';
 
-  function getRate(user) {
-    return USER_RATES.hasOwnProperty(user) ? USER_RATES[user] : 1;
+  function getUserRate(user) {
+    return dynamicUserRates.hasOwnProperty(user) ? dynamicUserRates[user] : 1;
+  }
+  function getProjectRate(project) {
+    return dynamicProjectRates.hasOwnProperty(project) ? dynamicProjectRates[project] : 1;
+  }
+  function getCombinedRate(row) {
+    return getUserRate(row['User'] || '') * getProjectRate(row['Project'] || '');
   }
   function normalizeText(value) {
     return (value || '').toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -305,7 +310,7 @@
 
   function getHoursForView(row) {
     var h = parseDur(row['Time']);
-    if (hourViewMode === 'processed') return h * getRate(row['User'] || '');
+    if (hourViewMode === 'processed') return h * getCombinedRate(row);
     return h;
   }
   function getHoursViewLabel() {
@@ -376,7 +381,7 @@
   /* ── Stats ── */
   function renderStats(data) {
     var total=data.reduce(function(s,r){return s+parseDur(r['Time']);},0);
-    var processed=data.reduce(function(s,r){return s+parseDur(r['Time'])*getRate(r['User']||'');},0);
+    var processed=data.reduce(function(s,r){return s+parseDur(r['Time'])*getCombinedRate(r);},0);
     var areas=[...new Set(data.map(function(r){return r['Client'];}).filter(function(a){return VALID_AREAS.indexOf(a)!==-1;}))];
     var projects=[...new Set(data.map(function(r){return r['Project'];}).filter(Boolean))];
     document.getElementById('s-total').textContent      = fmtH(total);
@@ -503,6 +508,31 @@
       '<div class="loading-state"><div class="spinner"></div><span>Cargando&hellip;</span></div>';
 
     try {
+      // 0. Cargar CSV de configuración de reglas
+      async function fetchWithProxy(url) {
+        try { var r0=await fetch(url); if(r0.ok) return r0.text(); } catch(e){}
+        for (var pi=0; pi<CORS_PROXIES.length; pi++) {
+          try { var rp=await fetch(CORS_PROXIES[pi](url)); if(rp.ok) return rp.text(); } catch(e){}
+        }
+        throw new Error('No se pudo cargar: '+url);
+      }
+      try {
+        var configText = await fetchWithProxy(CONFIG_CSV_URL);
+        var configRows = parseCSV(configText);
+        dynamicUserRates    = {};
+        dynamicProjectRates = {};
+        configRows.forEach(function(row) {
+          var type = (row['Type']      || '').trim();
+          var ref  = (row['Reference'] || '').trim();
+          var rate = parseFloat(row['Price Prop']);
+          if (!ref || isNaN(rate)) return;
+          if (type === 'User')    dynamicUserRates[ref]    = rate;
+          else if (type === 'Project') dynamicProjectRates[ref] = rate;
+        });
+      } catch(cfgErr) {
+        console.warn('No se pudo cargar config de precios:', cfgErr);
+      }
+
       // 1. Intento directo (funciona cuando se sirve desde un servidor web)
       var csvText = null;
       try {
