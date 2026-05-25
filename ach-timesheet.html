@@ -220,6 +220,7 @@
   // Tasas dinámicas cargadas desde el CSV de configuración
   var dynamicUserRates    = {};
   var dynamicProjectRates = {};
+  var dynamicTaskRates    = {};
 
   var VALID_AREAS = ['Dir. Innovaci\u00f3n', 'Dir. Producto', 'Vicepresidencia'];
   // ──────────────────────────────────────────────────────────────────
@@ -239,8 +240,11 @@
   function getProjectRate(project) {
     return dynamicProjectRates.hasOwnProperty(project) ? dynamicProjectRates[project] : 1;
   }
+  function getTaskRate(task) {
+    return dynamicTaskRates.hasOwnProperty(task) ? dynamicTaskRates[task] : 1;
+  }
   function getCombinedRate(row) {
-    return getUserRate(row['User'] || '') * getProjectRate(row['Project'] || '');
+    return getUserRate(row['User'] || '') * getProjectRate(row['Project'] || '') * getTaskRate(row['Task'] || '');
   }
   function normalizeText(value) {
     return (value || '').toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -521,6 +525,7 @@
         var configRows = parseCSV(configText);
         dynamicUserRates    = {};
         dynamicProjectRates = {};
+        dynamicTaskRates    = {};
         configRows.forEach(function(row) {
           var type = (row['Type']      || '').trim();
           var ref  = (row['Reference'] || '').trim();
@@ -528,6 +533,7 @@
           if (!ref || isNaN(rate)) return;
           if (type === 'User')    dynamicUserRates[ref]    = rate;
           else if (type === 'Project') dynamicProjectRates[ref] = rate;
+          else if (type === 'Task')    dynamicTaskRates[ref]    = rate;
         });
       } catch(cfgErr) {
         console.warn('No se pudo cargar config de precios:', cfgErr);
