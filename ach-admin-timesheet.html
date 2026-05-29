@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ACH Admin Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridjs@5.0.2/dist/theme/mermaid.min.css" integrity="sha384-jZvDSsmGB9oGGT/4l9bHXGoAv1OxvG/cFmSo0dZaSqmBgvQTKDBFAMftlXTmMbNW" crossorigin="anonymous">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gridjs@5.0.2/dist/gridjs.umd.js" integrity="sha384-/XXDzxe4FsGiAe50i/u9pY/Vy/uX654MHB1xoc1BJNnH1WXHhqHga9g3q5tF4gj7" crossorigin="anonymous"></script>
+  <style>
+    :root { color-scheme: light; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      background: #f0f4f9;
+      color: #1a2236;
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    .header {
+      background: linear-gradient(130deg, #12376e 0%, #1a6faf 100%);
+      color: white;
+      padding: 22px 26px;
+      border-radius: 16px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .header h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+    .header .sub { font-size: 13px; opacity: 0.8; margin-top: 4px; }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .meta { font-size: 12px; opacity: 0.65; text-align: right; }
+    .btn-reload {
+      padding: 7px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1.5px solid rgba(255,255,255,0.4);
+      background: rgba(255,255,255,0.12);
+      color: white;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-reload:hover { background: rgba(255,255,255,0.22); }
+
+    .filters {
+      background: white;
+      border-radius: 14px;
+      padding: 14px 18px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+      margin-bottom: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 13px;
+    }
+    .filter-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .filter-divider { height: 1px; background: #f0f3f8; }
+    .filter-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #8899aa;
+      min-width: 70px;
+      flex-shrink: 0;
+    }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 13px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1.5px solid #dde3ee;
+      background: white;
+      color: #667;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .chip:hover { border-color: var(--c,#1a6faf); color: var(--c,#1a6faf); }
+    .chip.active { background: var(--c,#1a6faf); border-color: var(--c,#1a6faf); color: white; }
+    .chip .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.75; flex-shrink: 0; }
+
+    .date-inputs { display: flex; align-items: center; gap: 6px; margin-left: 4px; flex-wrap: wrap; }
+    .date-sep { font-size: 12px; color: #aab; }
+    input[type="date"] {
+      padding: 5px 10px;
+      border: 1.5px solid #dde3ee;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #667;
+      background: white;
+      cursor: pointer;
+    }
+    input[type="date"]:focus { outline: none; border-color: #1a6faf; }
+    .btn-clear {
+      padding: 5px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1.5px solid #dde3ee;
+      background: white;
+      color: #aab;
+      cursor: pointer;
+    }
+    .btn-clear:hover { border-color: #e74c3c; color: #e74c3c; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+    .stat-card {
+      background: white;
+      border-radius: 14px;
+      padding: 18px 20px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+      border-left: 4px solid var(--accent,#1a6faf);
+    }
+    .stat-card.highlight { background: linear-gradient(135deg, #f0f7ff, #e8f4ff); }
+    .stat-card .lbl {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: #8899aa;
+      margin-bottom: 8px;
+    }
+    .stat-card .val { font-size: 26px; font-weight: 800; color: #1a2236; line-height: 1; }
+    .stat-card .hint {
+      font-size: 11px;
+      color: #aab;
+      margin-top: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .card,
+    .table-card {
+      background: white;
+      border-radius: 14px;
+      padding: 18px 20px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+    }
+    .card { margin-bottom: 18px; }
+    .card h3,
+    .table-card h3 {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: #8899aa;
+      margin-bottom: 14px;
+    }
+    .chart-wrap { position: relative; height: 280px; }
+
+    .gridjs-wrapper { border: none !important; box-shadow: none !important; }
+    .gridjs-head input {
+      font-size: 13px;
+      border-radius: 8px;
+      border: 1.5px solid #dde3ee;
+      padding: 6px 10px;
+    }
+    .gridjs-th {
+      background: #f5f7fb !important;
+      font-size: 11px !important;
+      font-weight: 700 !important;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #667 !important;
+    }
+    .gridjs-td { font-size: 13px !important; vertical-align: middle; }
+    .gridjs-footer { border: none !important; }
+
+    .loading-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+      color: #8899aa;
+      gap: 14px;
+    }
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid #dde3ee;
+      border-top-color: #1a6faf;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-box {
+      background: #fff5f5;
+      border: 1.5px solid #ffc0c0;
+      color: #cc2222;
+      border-radius: 10px;
+      padding: 16px 18px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .error-box pre {
+      margin-top: 8px;
+      font-size: 11px;
+      background: #fff0f0;
+      padding: 8px;
+      border-radius: 6px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div>
+      <h1>&#128188; ACH Vista Administrador</h1>
+      <p class="sub" id="sub-text">Cargando datos desde Google Sheets&hellip;</p>
+    </div>
+    <div class="header-right">
+      <span class="meta" id="meta-text"></span>
+      <button class="btn-reload" onclick="loadData()">&#8635; Recargar</button>
+    </div>
+  </div>
+
+  <div class="filters">
+    <div class="filter-row">
+      <span class="filter-label">Per&iacute;odo</span>
+      <div class="chips" id="date-chips">
+        <button class="chip active" data-preset="" style="--c:#1a2236" onclick="setQuickDate('')">Todo</button>
+        <button class="chip" data-preset="week" style="--c:#1a6faf" onclick="setQuickDate('week')">&Uacute;ltima semana</button>
+        <button class="chip" data-preset="month" style="--c:#1a6faf" onclick="setQuickDate('month')">&Uacute;ltimo mes</button>
+      </div>
+      <div class="date-inputs">
+        <input type="date" id="date-from" title="Desde" onchange="onDateInputChange()">
+        <span class="date-sep">&rarr;</span>
+        <input type="date" id="date-to" title="Hasta" onchange="onDateInputChange()">
+        <button class="btn-clear" onclick="clearDates()">&times;</button>
+      </div>
+    </div>
+    <div class="filter-divider"></div>
+    <div class="filter-row">
+      <span class="filter-label">&Aacute;rea</span>
+      <div class="chips" id="area-chips"></div>
+    </div>
+    <div class="filter-divider"></div>
+    <div class="filter-row">
+      <span class="filter-label">Proyecto</span>
+      <div class="chips" id="project-chips"></div>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card highlight" style="--accent:#1a6faf">
+      <div class="lbl">Facturaci&oacute;n total</div>
+      <div class="val" id="s-billing">&mdash;</div>
+      <div class="hint" id="s-billing-h">suma facturable por usuario</div>
+    </div>
+    <div class="stat-card" style="--accent:#16a085">
+      <div class="lbl">Horas totales</div>
+      <div class="val" id="s-total">&mdash;</div>
+      <div class="hint" id="s-total-h"></div>
+    </div>
+    <div class="stat-card" style="--accent:#e67e22">
+      <div class="lbl">Horas procesadas</div>
+      <div class="val" id="s-processed">&mdash;</div>
+      <div class="hint" id="s-processed-h"></div>
+    </div>
+    <div class="stat-card" style="--accent:#8e44ad">
+      <div class="lbl">Usuarios</div>
+      <div class="val" id="s-users">&mdash;</div>
+      <div class="hint" id="s-users-h"></div>
+    </div>
+    <div class="stat-card" style="--accent:#2c3e50">
+      <div class="lbl">Registros</div>
+      <div class="val" id="s-entries">&mdash;</div>
+      <div class="hint">entradas de tiempo filtradas</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Facturaci&oacute;n por usuario (top 12)</h3>
+    <div class="chart-wrap"><canvas id="chart-users"></canvas></div>
+  </div>
+
+  <div class="table-card">
+    <h3>Resumen administrativo por usuario</h3>
+    <div id="grid-container">
+      <div class="loading-state"><div class="spinner"></div><span>Cargando&hellip;</span></div>
+    </div>
+  </div>
+
+<script>
+  var CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSLMbCuGXheKqd1iPihPJEUcMIRKZznrWmeEx_EmsGJ7NJcAW9EQXHHIse0uOLzPP-0QkZMPNDcTtWJ/pub?output=csv';
+  var CONFIG_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQCah0aKR_6J9QgAQc9OJdblrcF3hmKkNkLkNt-YiLcXynUaukVn2KlUkPbkRIarEe168fNUXAdWF0-/pub?gid=0&single=true&output=csv';
+
+  var CORS_PROXIES = [
+    function(url){ return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url); },
+    function(url){ return 'https://corsproxy.io/?' + encodeURIComponent(url); }
+  ];
+
+  var BILLING_LABEL = 'u';
+
+  var dynamicUserRates = {};
+  var dynamicProjectRates = {};
+  var dynamicTaskRates = {};
+
+  var VALID_AREAS = ['Dir. Innovaci\u00f3n', 'Dir. Producto', 'Vicepresidencia'];
+  var PALETTE = ['#1a6faf','#27ae60','#8e44ad','#e67e22','#e74c3c','#16a085','#2980b9','#f39c12','#c0392b','#1abc9c'];
+
+  var allData = [];
+  var filteredData = [];
+  var selectedAreas = new Set();
+  var selectedProjects = new Set();
+  var dateFrom = null;
+  var dateTo = null;
+  var quickPreset = '';
+
+  var chartUsers = null;
+  var grid = null;
+
+  function getUserRate(user) {
+    return dynamicUserRates.hasOwnProperty(user) ? dynamicUserRates[user] : 1;
+  }
+  function getProjectRate(project) {
+    return dynamicProjectRates.hasOwnProperty(project) ? dynamicProjectRates[project] : 1;
+  }
+  function getTaskRate(task) {
+    return dynamicTaskRates.hasOwnProperty(task) ? dynamicTaskRates[task] : 1;
+  }
+  function getCombinedRate(row) {
+    return getUserRate(row['User'] || '') * getProjectRate(row['Project'] || '') * getTaskRate(row['Task'] || '');
+  }
+
+  function normalizeText(value) {
+    return (value || '').toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+  function canonicalArea(area) {
+    var n = normalizeText(area);
+    if (!n) return '';
+    if (n.indexOf('innovacion') !== -1) return 'Dir. Innovaci\u00f3n';
+    if (n.indexOf('producto') !== -1) return 'Dir. Producto';
+    if (n.indexOf('vicepresidencia') !== -1) return 'Vicepresidencia';
+    return '';
+  }
+
+  function parseCSVLine(line) {
+    var result = [];
+    var cur = '';
+    var inQ = false;
+    for (var i = 0; i < line.length; i++) {
+      var c = line[i];
+      if (c === '"') {
+        if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+        else inQ = !inQ;
+      } else if (c === ',' && !inQ) {
+        result.push(cur.trim());
+        cur = '';
+      } else {
+        cur += c;
+      }
+    }
+    result.push(cur.trim());
+    return result;
+  }
+
+  function parseCSV(text) {
+    var lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim().split('\n');
+    if (lines.length < 2) return [];
+    var headers = parseCSVLine(lines[0]);
+    var rows = [];
+    for (var i = 1; i < lines.length; i++) {
+      if (!lines[i].trim()) continue;
+      var cells = parseCSVLine(lines[i]);
+      while (cells.length < headers.length) cells.push('');
+      var row = {};
+      headers.forEach(function(h, j) { row[h] = cells[j] || ''; });
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  function parseDur(iso) {
+    if (!iso) return 0;
+    var m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:([\d.]+)S)?/);
+    if (!m) return 0;
+    return (+m[1]||0) + (+m[2]||0)/60 + (+m[3]||0)/3600;
+  }
+  function fmtH(h) {
+    var hh = Math.floor(h);
+    var mm = Math.round((h - hh) * 60);
+    if (hh === 0) return mm + 'm';
+    if (mm === 0) return hh + 'h';
+    return hh + 'h ' + mm + 'm';
+  }
+  function fmtHDec(h) {
+    return h.toFixed(2) + 'h';
+  }
+  function fmtNum(v) {
+    return new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 }).format(v);
+  }
+  function fmtMoneyUnits(v) {
+    return fmtNum(v) + ' ' + BILLING_LABEL;
+  }
+  function toDateOnly(s) {
+    if (!s) return null;
+    try {
+      var d = new Date(s);
+      return isNaN(d) ? null : new Date(d.toDateString());
+    } catch(e) {
+      return null;
+    }
+  }
+
+  function setQuickDate(preset) {
+    quickPreset = preset;
+    var now = new Date();
+    if (preset === 'week') {
+      dateTo = new Date(now);
+      dateTo.setHours(23,59,59,999);
+      dateFrom = new Date(now);
+      dateFrom.setDate(dateFrom.getDate() - 7);
+      dateFrom.setHours(0,0,0,0);
+    } else if (preset === 'month') {
+      dateTo = new Date(now);
+      dateTo.setHours(23,59,59,999);
+      dateFrom = new Date(now);
+      dateFrom.setMonth(dateFrom.getMonth() - 1);
+      dateFrom.setHours(0,0,0,0);
+    } else {
+      dateFrom = null;
+      dateTo = null;
+    }
+
+    document.getElementById('date-from').value = dateFrom ? dateFrom.toISOString().slice(0,10) : '';
+    document.getElementById('date-to').value = dateTo ? dateTo.toISOString().slice(0,10) : '';
+    syncDateChips();
+    applyFilters();
+  }
+
+  function onDateInputChange() {
+    quickPreset = 'custom';
+    var fv = document.getElementById('date-from').value;
+    var tv = document.getElementById('date-to').value;
+    dateFrom = fv ? new Date(fv + 'T00:00:00') : null;
+    dateTo = tv ? new Date(tv + 'T23:59:59') : null;
+    syncDateChips();
+    applyFilters();
+  }
+
+  function clearDates() {
+    quickPreset = '';
+    dateFrom = null;
+    dateTo = null;
+    document.getElementById('date-from').value = '';
+    document.getElementById('date-to').value = '';
+    syncDateChips();
+    applyFilters();
+  }
+
+  function syncDateChips() {
+    document.querySelectorAll('#date-chips .chip').forEach(function(chip){
+      chip.classList.toggle('active', chip.dataset.preset === quickPreset);
+    });
+  }
+
+  function summarizeByUser(data) {
+    var map = {};
+    data.forEach(function(row) {
+      var user = row['User'] || 'Sin usuario';
+      var totalH = parseDur(row['Time']);
+      var processedH = totalH * getCombinedRate(row);
+      if (!map[user]) {
+        map[user] = { user: user, totalHours: 0, processedHours: 0, entries: 0 };
+      }
+      map[user].totalHours += totalH;
+      map[user].processedHours += processedH;
+      map[user].entries += 1;
+    });
+
+    return Object.values(map).map(function(item) {
+      return {
+        user: item.user,
+        totalHours: item.totalHours,
+        processedHours: item.processedHours,
+        billing: item.processedHours,
+        entries: item.entries
+      };
+    }).sort(function(a, b){
+      return b.billing - a.billing;
+    });
+  }
+
+  function renderStats(data, summary) {
+    var totalHours = data.reduce(function(s, r){ return s + parseDur(r['Time']); }, 0);
+    var processedHours = data.reduce(function(s, r){ return s + (parseDur(r['Time']) * getCombinedRate(r)); }, 0);
+    var totalBilling = summary.reduce(function(s, u){ return s + u.billing; }, 0);
+
+    document.getElementById('s-billing').textContent = fmtMoneyUnits(totalBilling);
+    document.getElementById('s-billing-h').textContent = 'unidades facturables acumuladas';
+
+    document.getElementById('s-total').textContent = fmtH(totalHours);
+    document.getElementById('s-total-h').textContent = fmtHDec(totalHours) + ' exactas';
+
+    document.getElementById('s-processed').textContent = fmtH(processedHours);
+    document.getElementById('s-processed-h').textContent = fmtHDec(processedHours) + ' ponderadas';
+
+    document.getElementById('s-users').textContent = summary.length;
+    document.getElementById('s-users-h').textContent = summary.slice(0, 2).map(function(u){ return u.user; }).join(', ') || '—';
+
+    document.getElementById('s-entries').textContent = data.length;
+  }
+
+  function renderUserChart(summary) {
+    var ctx = document.getElementById('chart-users').getContext('2d');
+    if (chartUsers) chartUsers.destroy();
+
+    var top = summary.slice(0, 12);
+    if (!top.length) {
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      return;
+    }
+
+    chartUsers = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: top.map(function(r){ return r.user; }),
+        datasets: [{
+          label: 'Facturación',
+          data: top.map(function(r){ return r.billing; }),
+          backgroundColor: top.map(function(_,i){ return PALETTE[i % PALETTE.length] + 'bb'; }),
+          borderColor: top.map(function(_,i){ return PALETTE[i % PALETTE.length]; }),
+          borderWidth: 2,
+          borderRadius: 7
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(c){ return ' ' + fmtMoneyUnits(c.parsed.y); }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            grid: { color: '#f0f3f8' },
+            ticks: { callback: function(v){ return fmtMoneyUnits(v); }, font: { size: 11 } }
+          },
+          x: {
+            grid: { display: false },
+            ticks: { font: { size: 11 }, maxRotation: 30 }
+          }
+        }
+      }
+    });
+  }
+
+  function renderTable(summary) {
+    var container = document.getElementById('grid-container');
+
+    if (!summary.length) {
+      container.innerHTML = '<div class="loading-state"><span>Sin registros para los filtros seleccionados.</span></div>';
+      grid = null;
+      return;
+    }
+
+    var rows = summary.map(function(r){
+      return [
+        r.user,
+        fmtHDec(r.totalHours),
+        fmtHDec(r.processedHours),
+        fmtMoneyUnits(r.billing),
+        r.entries
+      ];
+    });
+
+    var columns = [
+      { name: 'Usuario' },
+      { name: 'Horas totales', width: '130px' },
+      { name: 'Horas procesadas', width: '140px' },
+      { name: 'Facturación', width: '130px' },
+      { name: 'Registros', width: '100px' }
+    ];
+
+    if (grid) {
+      grid.updateConfig({ columns: columns, data: rows }).forceRender();
+      return;
+    }
+
+    container.innerHTML = '';
+    grid = new gridjs.Grid({
+      columns: columns,
+      data: rows,
+      sort: true,
+      search: { placeholder: 'Buscar usuario…' },
+      pagination: { limit: 12, summary: true },
+      language: {
+        pagination: {
+          previous: '‹',
+          next: '›',
+          showing: 'Mostrando',
+          results: function(){ return 'usuarios'; }
+        }
+      }
+    }).render(container);
+  }
+
+  function makeChips(containerId, items, selectedSet, syncFn) {
+    var container = document.getElementById(containerId);
+    container.innerHTML = '';
+
+    var allChip = document.createElement('button');
+    allChip.className = 'chip active';
+    allChip.dataset.value = '__all__';
+    allChip.style.setProperty('--c', '#1a2236');
+    allChip.textContent = 'Todos';
+    allChip.onclick = function() {
+      selectedSet.clear();
+      syncFn();
+      applyFilters();
+    };
+    container.appendChild(allChip);
+
+    items.forEach(function(item, i){
+      var chip = document.createElement('button');
+      chip.className = 'chip';
+      chip.dataset.value = item;
+      chip.style.setProperty('--c', PALETTE[i % PALETTE.length]);
+
+      var dot = document.createElement('span');
+      dot.className = 'dot';
+      chip.appendChild(dot);
+      chip.appendChild(document.createTextNode(item));
+
+      chip.onclick = function() {
+        if (selectedSet.has(item)) selectedSet.delete(item);
+        else selectedSet.add(item);
+        syncFn();
+        applyFilters();
+      };
+
+      container.appendChild(chip);
+    });
+  }
+
+  function syncChipGroup(containerId, selectedSet) {
+    document.getElementById(containerId).querySelectorAll('.chip').forEach(function(chip){
+      var v = chip.dataset.value;
+      chip.classList.toggle('active', v === '__all__' ? selectedSet.size === 0 : selectedSet.has(v));
+    });
+  }
+
+  function applyFilters() {
+    filteredData = allData.filter(function(r){
+      if (selectedAreas.size > 0 && !selectedAreas.has(r['Client'])) return false;
+      if (selectedProjects.size > 0 && !selectedProjects.has(r['Project'])) return false;
+
+      if (dateFrom || dateTo) {
+        var d = toDateOnly(r['Date']);
+        if (d) {
+          if (dateFrom && d < new Date(dateFrom.toDateString())) return false;
+          if (dateTo && d > new Date(dateTo.toDateString())) return false;
+        }
+      }
+      return true;
+    });
+
+    var summary = summarizeByUser(filteredData);
+    renderStats(filteredData, summary);
+    renderUserChart(summary);
+    renderTable(summary);
+  }
+
+  async function fetchWithProxy(url) {
+    try {
+      var r0 = await fetch(url);
+      if (r0.ok) return r0.text();
+    } catch(e) {}
+
+    for (var pi = 0; pi < CORS_PROXIES.length; pi++) {
+      try {
+        var rp = await fetch(CORS_PROXIES[pi](url));
+        if (rp.ok) return rp.text();
+      } catch(e2) {}
+    }
+
+    throw new Error('No se pudo cargar: ' + url);
+  }
+
+  async function loadData() {
+    selectedAreas.clear();
+    selectedProjects.clear();
+    quickPreset = '';
+    dateFrom = null;
+    dateTo = null;
+
+    document.getElementById('date-from').value = '';
+    document.getElementById('date-to').value = '';
+
+    document.getElementById('sub-text').textContent = 'Cargando datos…';
+    document.getElementById('meta-text').textContent = '';
+    document.getElementById('grid-container').innerHTML = '<div class="loading-state"><div class="spinner"></div><span>Cargando&hellip;</span></div>';
+
+    try {
+      try {
+        var configText = await fetchWithProxy(CONFIG_CSV_URL);
+        var configRows = parseCSV(configText);
+
+        dynamicUserRates = {};
+        dynamicProjectRates = {};
+        dynamicTaskRates = {};
+
+        configRows.forEach(function(row) {
+          var type = (row['Type'] || '').trim();
+          var ref = (row['Reference'] || '').trim();
+          var rate = parseFloat(row['Price Prop']);
+          if (!ref || isNaN(rate)) return;
+
+          if (type === 'User') dynamicUserRates[ref] = rate;
+          else if (type === 'Project') dynamicProjectRates[ref] = rate;
+          else if (type === 'Task') dynamicTaskRates[ref] = rate;
+        });
+      } catch(cfgErr) {
+        console.warn('No se pudo cargar config de precios:', cfgErr);
+      }
+
+      var csvText = await fetchWithProxy(CSV_URL);
+      allData = parseCSV(csvText).map(function(row){
+        row['Client'] = canonicalArea(row['Client']);
+        return row;
+      });
+
+      var now = new Date();
+      document.getElementById('sub-text').textContent = allData.length + ' registro' + (allData.length !== 1 ? 's' : '') + ' de tiempo';
+      document.getElementById('meta-text').textContent = 'Actualizado ' + now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+
+      var projects = Array.from(new Set(allData.map(function(r){ return r['Project']; }).filter(Boolean))).sort();
+
+      makeChips('area-chips', VALID_AREAS, selectedAreas, function(){ syncChipGroup('area-chips', selectedAreas); });
+      makeChips('project-chips', projects, selectedProjects, function(){ syncChipGroup('project-chips', selectedProjects); });
+      syncDateChips();
+
+      filteredData = allData.slice();
+      applyFilters();
+    } catch(err) {
+      console.error('Admin dashboard error:', err);
+      document.getElementById('sub-text').textContent = 'Error al cargar datos';
+      document.getElementById('grid-container').innerHTML =
+        '<div class="error-box">'
+        + '<strong>&#10060; No se pudieron cargar los datos.</strong><br><br>'
+        + 'Error técnico: ' + err.message + '<br><br>'
+        + 'Verifica que el Sheet esté publicado como CSV.'
+        + '<pre>URL: ' + CSV_URL + '</pre>'
+        + '</div>';
+    }
+  }
+
+  loadData();
+</script>
+</body>
+</html>

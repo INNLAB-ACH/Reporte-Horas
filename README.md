@@ -2,6 +2,11 @@
 
 Aplicación HTML para visualizar y procesar horas desde Google Sheets.
 
+## Vistas disponibles
+
+- `ach-timesheet.html`: dashboard operativo con detalle por registro, área y proyecto.
+- `ach-admin-timesheet.html`: vista administrativa con resumen por usuario de facturación, horas totales y horas procesadas.
+
 ## Configuración de precios
 
 La hoja de configuración de precios debe incluir estas columnas:
